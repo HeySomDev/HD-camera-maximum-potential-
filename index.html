@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>গ্লাস ক্যামেরা · কালার বুস্ট</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+    * { margin:0; padding:0; box-sizing:border-box; }
+    html, body {
+      width:100%;
+      height:100%;
+      overflow:hidden;
+      background:#000;
+      color:#fff;
+      font-family:'Inter', system-ui, sans-serif;
+      touch-action:manipulation;
+    }
+
+    #video {
+      position:fixed;
+      inset:0;
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      z-index:1;
+      background:#000;
+    }
+
+    .overlay {
+      position:fixed;
+      inset:0;
+      z-index:2;
+      pointer-events:none;
+    }
+
+    .glass {
+      background:rgba(255,255,255,0.08);
+      backdrop-filter:blur(20px);
+      -webkit-backdrop-filter:blur(20px);
+      border:1px solid rgba(255,255,255,0.18);
+      border-radius:9999px;
+      box-shadow:0 8px 32px rgba(0,0,0,0.3);
+    }
+
+    .mode-selector {
+      position:fixed;
+      top:20px;
+      right:20px;
+      z-index:10;
+      pointer-events:auto;
+    }
+
+    .mode-pill {
+      padding:6px 16px;
+      font-size:13.5px;
+      font-weight:600;
+      color:rgba(255,255,255,0.9);
+      cursor:pointer;
+    }
+
+    .mode-options {
+      position:absolute;
+      top:42px;
+      right:0;
+      background:rgba(20,20,20,0.96);
+      backdrop-filter:blur(20px);
+      border:1px solid rgba(255,255,255,0.15);
+      border-radius:14px;
+      padding:8px 0;
+      width:165px;
+      display:none;
+      box-shadow:0 10px 30px rgba(0,0,0,0.5);
+    }
+
+    .mode-option {
+      padding:9px 20px;
+      font-size:14px;
+      font-weight:500;
+      cursor:pointer;
+      transition:.2s;
+    }
+
+    .mode-option:hover, .mode-option.active {
+      background:rgba(255,255,255,0.12);
+    }
+
+    .sub-option {
+      padding:7px 20px;
+      font-size:12.5px;
+      color:rgba(255,255,255,0.75);
+      cursor:pointer;
+    }
+
+    .sub-option:hover {
+      background:rgba(255,255,255,0.1);
+      color:#fff;
+    }
+
+    .reset-option {
+      padding:10px 20px;
+      font-size:13px;
+      color:#ff6b6b;
+      cursor:pointer;
+      border-top:1px solid rgba(255,255,255,0.1);
+      margin-top:6px;
+    }
+
+    .reset-option:hover {
+      background:rgba(255,107,107,0.15);
+    }
+
+    .controls {
+      position:fixed;
+      bottom:40px;
+      left:50%;
+      transform:translateX(-50%);
+      display:flex;
+      align-items:center;
+      gap:50px;
+      z-index:10;
+      pointer-events:auto;
+    }
+
+    .capture-btn {
+      width:82px;
+      height:82px;
+      border-radius:50%;
+      background:rgba(255,255,255,0.95);
+      border:6px solid #fff;
+      box-shadow:0 0 0 10px rgba(255,255,255,0.25);
+      cursor:pointer;
+      transition:transform .2s;
+      outline:none;
+      -webkit-tap-highlight-color:transparent;
+    }
+
+    .capture-btn:active { transform:scale(0.92); }
+
+    .side-btn {
+      width:58px;
+      height:58px;
+      border-radius:50%;
+      background:rgba(255,255,255,0.12);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:26px;
+      backdrop-filter:blur(20px);
+      border:1px solid rgba(255,255,255,0.15);
+      transition:.3s;
+      outline:none;
+      -webkit-tap-highlight-color:transparent;
+    }
+
+    .side-btn:active {
+      background:rgba(255,255,255,0.25);
+      transform:scale(0.95);
+    }
+
+    .flash {
+      position:fixed;
+      inset:0;
+      background:#fff;
+      opacity:0;
+      pointer-events:none;
+      z-index:100;
+      transition:opacity .15s;
+    }
+
+    .preview {
+      position:fixed;
+      top:25px;
+      left:25px;
+      width:85px;
+      height:120px;
+      border-radius:18px;
+      overflow:hidden;
+      border:3px solid rgba(255,255,255,0.3);
+      box-shadow:0 10px 30px rgba(0,0,0,0.5);
+      display:none;
+      z-index:20;
+    }
+
+    .preview img {
+      width:100%;
+      height:100%;
+      object-fit:cover;
+    }
+
+    .timer {
+      position:fixed;
+      top:100px;
+      left:50%;
+      transform:translateX(-50%);
+      font-size:72px;
+      font-weight:700;
+      text-shadow:0 4px 20px rgba(0,0,0,0.7);
+      z-index:30;
+      display:none;
+    }
+
+    .result-page {
+      position:fixed;
+      inset:0;
+      background:#000;
+      z-index:200;
+      display:none;
+      align-items:center;
+      justify-content:center;
+    }
+
+    .result-page img {
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      background:#000;
+    }
+
+    canvas { display:none; }
+  </style>
+</head>
+<body>
+  <video id="video" autoplay playsinline></video>
+
+  <div class="overlay">
+    <div class="mode-selector glass">
+      <div class="mode-pill" id="currentMode" onclick="toggleModeMenu()">HD</div>
+      <div class="mode-options" id="modeOptions">
+        <div class="mode-option active" onclick="setQualityMode(0)">HD</div>
+        <div class="mode-option" onclick="setQualityMode(1)">Ultra HD</div>
+        <div class="mode-option" onclick="setQualityMode(2)">DSLR</div>
+
+        <div style="height:1px;background:rgba(255,255,255,0.1);margin:6px 12px;"></div>
+
+        <div class="sub-option" onclick="toggleHDR(this)">HDR</div>
+        <div class="sub-option" onclick="togglePortrait(this)">Portrait</div>
+
+        <div class="reset-option" onclick="resetSettings()">সেটিংস রিসেট করুন</div>
+      </div>
+    </div>
+
+    <div id="preview" class="preview">
+      <img id="thumb" src="" alt="">
+    </div>
+
+    <div id="timer" class="timer">3</div>
+
+    <div class="controls">
+      <div class="side-btn glass" onclick="switchCamera()" title="ক্যামেরা সুইচ">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 3h6v6"></path>
+          <path d="M9 21H3v-6"></path>
+          <path d="M21 3L3 21"></path>
+        </svg>
+      </div>
+
+      <div id="captureBtn" class="capture-btn" onclick="capturePhoto()"></div>
+
+      <div class="side-btn glass" onclick="toggleGallery()" title="গ্যালারি">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+          <circle cx="8.5" cy="8.5" r="1.5"></circle>
+          <polyline points="21 15 16 10 5 21"></polyline>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <div id="flash" class="flash"></div>
+  <div id="resultPage" class="result-page">
+    <img id="resultImg" alt="Result">
+  </div>
+
+  <canvas id="canvas"></canvas>
+
+  <script>
+    let stream = null;
+    let currentCamera = 'environment';
+    let currentQuality = 0;
+    let isHDR = false;
+    let isPortrait = false;
+
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const flash = document.getElementById('flash');
+    const preview = document.getElementById('preview');
+    const thumb = document.getElementById('thumb');
+    const timerEl = document.getElementById('timer');
+    const currentModeEl = document.getElementById('currentMode');
+    const modeOptions = document.getElementById('modeOptions');
+    const resultPage = document.getElementById('resultPage');
+    const resultImg = document.getElementById('resultImg');
+
+    const qualityModes = ['HD', 'Ultra HD', 'DSLR'];
+
+    const CAMERA_PRESETS = {
+      0: { filter: "contrast(110%) brightness(103%) saturate(130%)", name: "HD" },
+      1: { filter: "contrast(118%) brightness(105%) saturate(145%) drop-shadow(0px 0px 1px #fff)", name: "UltraHD" },
+      2: { filter: "contrast(125%) saturate(155%) brightness(106%) sepia(5%) hue-rotate(-5deg) blur(0.15px)", name: "DSLR" }
+    };
+
+    async function startCamera() {
+      if (stream) stream.getTracks().forEach(track => track.stop());
+
+      let width = currentQuality === 2 ? 1920 : currentQuality === 1 ? 1440 : 1280;
+      let height = currentQuality === 2 ? 1080 : currentQuality === 1 ? 1080 : 720;
+
+      if (isPortrait) [width, height] = [height, width];
+
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: currentCamera,
+            width: { ideal: width },
+            height: { ideal: height }
+          }
+        });
+        video.srcObject = stream;
+        await video.play();
+      } catch (err) {
+        console.error(err);
+        alert("ক্যামেরা চালু করতে সমস্যা হয়েছে।");
+      }
+    }
+
+    function switchCamera() {
+      currentCamera = currentCamera === 'environment' ? 'user' : 'environment';
+      startCamera();
+    }
+
+    function toggleModeMenu() {
+      modeOptions.style.display = modeOptions.style.display === 'block' ? 'none' : 'block';
+    }
+
+    function setQualityMode(mode) {
+      currentQuality = mode;
+      currentModeEl.textContent = qualityModes[mode];
+      document.querySelectorAll('.mode-option').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.mode-option')[mode].classList.add('active');
+      startCamera();
+    }
+
+    function toggleHDR(el) {
+      isHDR = !isHDR;
+      el.style.color = isHDR ? '#4ade80' : 'rgba(255,255,255,0.75)';
+    }
+
+    function togglePortrait(el) {
+      isPortrait = !isPortrait;
+      el.style.color = isPortrait ? '#4ade80' : 'rgba(255,255,255,0.75)';
+      startCamera();
+    }
+
+    function resetSettings() {
+      currentQuality = 0;
+      isHDR = false;
+      isPortrait = false;
+      currentModeEl.textContent = 'HD';
+      modeOptions.style.display = 'none';
+      document.querySelectorAll('.sub-option').forEach(opt => {
+        opt.style.color = 'rgba(255,255,255,0.75)';
+      });
+      startCamera();
+      alert("সব সেটিংস রিসেট করা হয়েছে");
+    }
+
+    function toggleGallery() {
+      alert("গ্যালারি খুলছে... (ছবি অটো ডাউনলোড হয়েছে)");
+    }
+
+    // 🌈 কালার বুস্ট ইঞ্জিন (ভোল্টেজ না বাড়িয়ে শুধু কালার বাড়ানো)
+    function purePixelEngineOnCanvas(sourceCanvas) {
+      const outCanvas = document.createElement('canvas');
+      outCanvas.width = sourceCanvas.width;
+      outCanvas.height = sourceCanvas.height;
+
+      const outCtx = outCanvas.getContext('2d', { willReadFrequently: true });
+      outCtx.drawImage(sourceCanvas, 0, 0);
+
+      const imageData = outCtx.getImageData(0, 0, outCanvas.width, outCanvas.height);
+      const d = imageData.data;
+
+      for (let i = 0; i < d.length; i += 4) {
+        let r = d[i], g = d[i + 1], b = d[i + 2];
+        let rn = r / 255, gn = g / 255, bn = b / 255;
+
+        // লুমিন্যান্স (গ্রেস্কেল)
+        const lum = 0.299 * rn + 0.587 * gn + 0.114 * bn;
+
+        // সেচুরেশন বাড়ানো (ভোল্টেজ/ব্রাইটনেস স্পর্শ করা হয়নি)
+        const satFactor = 1.55;  // +55% সেচুরেশন (ভোল্টেজ বাড়েনি)
+        rn = lum + satFactor * (rn - lum);
+        gn = lum + satFactor * (gn - lum);
+        bn = lum + satFactor * (bn - lum);
+
+        // ক্লিপিং (অতিরিক্ত রং যেন না যায়)
+        rn = Math.min(1, Math.max(0, rn));
+        gn = Math.min(1, Math.max(0, gn));
+        bn = Math.min(1, Math.max(0, bn));
+
+        // HDR টগল থাকলে ডায়নামিক রেঞ্জ সামান্য বাড়ানো (কালার ঠিক রেখে)
+        if (isHDR) {
+          rn = Math.pow(rn, 0.95);
+          gn = Math.pow(gn, 0.95);
+          bn = Math.pow(bn, 0.95);
+        }
+
+        d[i] = Math.round(rn * 255);
+        d[i + 1] = Math.round(gn * 255);
+        d[i + 2] = Math.round(bn * 255);
+      }
+
+      outCtx.putImageData(imageData, 0, 0);
+      return outCanvas;
+    }
+
+    async function capturePhoto() {
+      if (!stream) return;
+
+      flash.style.opacity = '0.75';
+      setTimeout(() => flash.style.opacity = '0', 120);
+
+      timerEl.style.display = 'block';
+      for (let i = 3; i >= 1; i--) {
+        timerEl.textContent = i;
+        await new Promise(r => setTimeout(r, 450));
+      }
+      timerEl.style.display = 'none';
+
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      processCapture(canvas, currentQuality);
+
+      // ✅ কালার বুস্ট + HDR (যদি অন) — কিন্তু ভোল্টেজ/ব্রাইটনেস বাড়ানো হয়নি
+      const processedCanvas = purePixelEngineOnCanvas(canvas);
+      const finalDataUrl = processedCanvas.toDataURL('image/jpeg', 0.97);
+
+      thumb.src = finalDataUrl;
+      preview.style.display = 'block';
+
+      resultImg.src = finalDataUrl;
+      resultPage.style.display = 'flex';
+
+      const link = document.createElement('a');
+      link.href = finalDataUrl;
+      link.download = `GlassCam_${CAMERA_PRESETS[currentQuality].name}${isHDR ? '_HDR' : ''}${isPortrait ? '_Portrait' : ''}_${Date.now()}.jpg`;
+      link.click();
+
+      if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
+
+      setTimeout(() => {
+        resultPage.style.display = 'none';
+      }, 1200);
+    }
+
+    function processCapture(canvas, modeIndex) {
+      const preset = CAMERA_PRESETS[modeIndex] || CAMERA_PRESETS[0];
+      ctx.filter = preset.filter;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // ভিগনেট (অপসারণ) — ডার্কনেস দূর করতে হালকা করা
+      const gradient = ctx.createRadialGradient(
+        canvas.width / 2, canvas.height / 2, canvas.width / 3.5,
+        canvas.width / 2, canvas.height / 2, canvas.width / 1.1
+      );
+      gradient.addColorStop(0, 'rgba(255,255,255,0.0)');
+      gradient.addColorStop(1, 'rgba(0,0,0,0.12)');  // আগের 0.35 → 0.12 (ডার্ক কম)
+
+      ctx.filter = 'none';
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.mode-selector')) modeOptions.style.display = 'none';
+    });
+
+    let touchStartX = 0;
+    document.addEventListener('touchstart', e => touchStartX = e.changedTouches[0].screenX, { passive: true });
+    document.addEventListener('touchend', e => {
+      if (Math.abs(e.changedTouches[0].screenX - touchStartX) > 120) switchCamera();
+    }, { passive: true });
+
+    window.onload = () => {
+      startCamera();
+      document.addEventListener('contextmenu', e => e.preventDefault());
+    };
+  </script>
+</body>
+</html>
